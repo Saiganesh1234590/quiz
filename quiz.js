@@ -1,25 +1,20 @@
 const app = document.getElementById("app");
 
+// total levels
+const TOTAL_LEVELS = 100;
+let level = 1;
+let currentQ = 0;
 let score = 0;
-let questionIndex = 0;
 let questions = [];
-let currentLevel = 1; // Start at Level 1
-const maxLevels = 100; // up to Level 100
-const questionsPerLevel = 3;
 
-// Decide difficulty based on level
-function getDifficulty(level) {
-  if (level <= 30) return "easy";
-  if (level <= 70) return "medium";
-  return "hard";
-}
-
+// Fetch questions from API
 async function fetchQuestions(difficulty) {
-  const res = await fetch(`https://opentdb.com/api.php?amount=${questionsPerLevel}&difficulty=${difficulty}&type=multiple`);
+  const res = await fetch(`https://opentdb.com/api.php?amount=3&difficulty=${difficulty}&type=multiple`);
   const data = await res.json();
   return data.results.map(q => {
-    const options = [...q.incorrect_answers, q.correct_answer];
-    options.sort(() => Math.random() - 0.5); // shuffle
+    const options = [...q.incorrect_answers];
+    const randIndex = Math.floor(Math.random() * (options.length + 1));
+    options.splice(randIndex, 0, q.correct_answer);
     return {
       question: q.question,
       options,
@@ -28,83 +23,113 @@ async function fetchQuestions(difficulty) {
   });
 }
 
-async function startQuiz() {
-  score = 0;
-  currentLevel = 1;
-  questionIndex = 0;
-  questions = await fetchQuestions(getDifficulty(currentLevel));
+// Decide difficulty based on level
+function getDifficulty(level) {
+  if (level <= 30) return "easy";
+  if (level <= 70) return "medium";
+  return "hard";
+}
+
+// Start level
+async function startLevel() {
+  const difficulty = getDifficulty(level);
+  questions = await fetchQuestions(difficulty);
+  currentQ = 0;
   renderQuestion();
 }
 
-function renderProgressBar() {
-  const percent = ((currentLevel - 1) / maxLevels) * 100;
+// Render progress bar
+function renderProgress() {
+  const progressPercent = (level / TOTAL_LEVELS) * 100;
   return `
-    <div class="w-full bg-gray-200 rounded-full h-4 mb-6 shadow-inner">
-      <div class="bg-green-500 h-4 rounded-full transition-all duration-500" style="width: ${percent}%;"></div>
+    <div class="w-full bg-gray-200 rounded-full h-3 mb-4">
+      <div class="bg-indigo-600 h-3 rounded-full" style="width:${progressPercent}%"></div>
     </div>
-    <p class="text-sm font-medium text-gray-600 mb-4">Level ${currentLevel} / ${maxLevels}</p>
   `;
 }
 
-function renderQuestion() {
-  if (questionIndex >= questions.length) {
-    // Level completed
-    if (currentLevel < maxLevels) {
-      currentLevel++;
-      questionIndex = 0;
-      loadNextLevel();
+// Render question
+function renderQuestion(feedback = "", selected = "") {
+  const q = questions[currentQ];
+
+  app.innerHTML = `
+    <h1 class="text-xl font-bold mb-2">Level ${level}</h1>
+    ${renderProgress()}
+    <p class="text-md mb-4">Score: ${score} | Question ${currentQ + 1} of ${questions.length}</p>
+    <p class="text-lg font-semibold mb-4">${q.question}</p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+      ${q.options
+        .map(
+          (opt) => `
+          <button 
+            class="w-full py-2 px-4 rounded-xl font-medium shadow-md transition ${
+              selected
+                ? opt === q.answer
+                  ? "bg-green-500 text-white"
+                  : opt === selected
+                  ? "bg-red-500 text-white"
+                  : "bg-gray-200"
+                : "bg-white hover:bg-indigo-100"
+            }"
+            onclick="handleAnswer('${opt}')"
+            ${selected ? "disabled" : ""}
+          >
+            ${opt}
+          </button>
+        `
+        )
+        .join("")}
+    </div>
+    ${
+      feedback
+        ? `<p class="mb-4 text-lg font-medium">${feedback}</p>
+           <button onclick="nextQuestion()" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl">Next</button>`
+        : ""
+    }
+  `;
+}
+
+// Handle answer
+function handleAnswer(option) {
+  const q = questions[currentQ];
+  if (option === q.answer) {
+    score++;
+    renderQuestion("✅ Correct!", option);
+  } else {
+    renderQuestion(`❌ Incorrect! Correct: ${q.answer}`, option);
+  }
+}
+
+// Next question or level
+function nextQuestion() {
+  if (currentQ + 1 < questions.length) {
+    currentQ++;
+    renderQuestion();
+  } else {
+    if (level < TOTAL_LEVELS) {
+      level++;
+      startLevel();
     } else {
       renderResults();
     }
-    return;
   }
-
-  const q = questions[questionIndex];
-
-  app.innerHTML = `
-    ${renderProgressBar()}
-    <h1 class="text-2xl font-bold mb-2 text-gray-800">Level ${currentLevel} (${getDifficulty(currentLevel).toUpperCase()})</h1>
-    <h2 class="text-xl font-semibold mb-4 text-gray-700">Question ${questionIndex + 1} of ${questionsPerLevel}</h2>
-    <p class="text-lg mb-6 text-gray-700">${q.question}</p>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-      ${q.options.map(option => `
-        <button class="option-btn w-full py-3 rounded-2xl bg-indigo-100 hover:bg-indigo-200 text-lg font-semibold shadow-md" data-option="${option}">
-          ${option}
-        </button>
-      `).join("")}
-    </div>
-    <p class="text-md font-medium text-gray-600 mb-4">Score: ${score}</p>
-  `;
-
-  document.querySelectorAll(".option-btn").forEach(btn => {
-    btn.addEventListener("click", () => handleAnswer(btn.dataset.option));
-  });
 }
 
-function handleAnswer(option) {
-  const q = questions[questionIndex];
-  if (option === q.answer) {
-    score++;
-    alert("✅ Correct!");
-  } else {
-    alert("❌ Incorrect! Correct Answer: " + q.answer);
-  }
-  questionIndex++;
-  renderQuestion();
-}
-
-async function loadNextLevel() {
-  alert(`🎉 Congrats! You cleared Level ${currentLevel - 1}. Now moving to Level ${currentLevel}!`);
-  questions = await fetchQuestions(getDifficulty(currentLevel));
-  renderQuestion();
-}
-
+// Results screen
 function renderResults() {
   app.innerHTML = `
-    <h2 class="text-3xl font-bold mb-4 text-gray-800">🏆 You completed all ${maxLevels} levels!</h2>
-    <p class="text-xl font-medium mb-6 text-gray-700">Your Final Score: ${score} / ${maxLevels * questionsPerLevel}</p>
-    <button onclick="startQuiz()" class="px-6 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-semibold shadow-md">Restart Quiz</button>
+    <h2 class="text-2xl font-bold mb-4">🎉 Quiz Completed!</h2>
+    <p class="text-lg mb-6">Your Final Score: ${score} / ${TOTAL_LEVELS * 3}</p>
+    <button onclick="restartQuiz()" class="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl">Restart Quiz</button>
   `;
 }
 
-startQuiz();
+// Restart quiz
+function restartQuiz() {
+  level = 1;
+  score = 0;
+  startLevel();
+}
+
+// Start the first level
+startLevel();
