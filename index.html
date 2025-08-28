@@ -6,12 +6,17 @@
   <title>Quiz App</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="flex justify-center items-center min-h-screen bg-gradient-to-r from-indigo-500 to-purple-600 p-4">
+<body class="flex flex-col justify-between min-h-screen bg-gradient-to-r from-indigo-500 to-purple-600 p-4">
 
-  <!-- Container for the quiz -->
-  <div id="app" class="w-full max-w-xl bg-white rounded-2xl shadow-2xl p-6 text-center"></div>
+  <!-- Quiz container -->
+  <div id="app" class="w-full max-w-xl mx-auto bg-white rounded-2xl shadow-2xl p-6 text-center"></div>
 
-  <!-- Load your quiz logic from quiz.js -->
+  <!-- Footer with creator name -->
+  <footer class="text-center text-white mt-6">
+    <p class="text-sm">Created by <span class="font-bold">Saiganesh</span> 🚀</p>
+  </footer>
+
+  <!-- Link to JS file -->
   <script src="quiz.js"></script>
 </body>
 </html>
